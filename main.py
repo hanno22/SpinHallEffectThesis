@@ -43,7 +43,7 @@ index_max = np.argmax(radial_profile)
 index_NA = 710
 radial_axis = np.arange(0, NA/index_NA * len(rads), NA/index_NA)
 
-cs = ax1.contourf(angs, radial_axis, pol, cmap='binary')
+cs = ax1.contourf(angs, radial_axis, pol)
 fig1.colorbar(cs)
 #fig1.safefig('results/' + probe_number + '/polarplot.png')
 plt.show()
