@@ -1,61 +1,102 @@
+# %%import libaries
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from scipy.ndimage.interpolation import geometric_transform
 import numpy as np
+import cv2 as cv
+import glob
+import os
+import re
+pol_data = np.genfromtxt('data/polorientation.csv', delimiter=',')
 
-probe_number = '1'
-def rgb2gray(rgb):
-    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
+#center = (1238, 1011)
+center = (1201, 1128)
+max_radius = 500
+# %%load data
+path = 'data/spin_hall/2'
+files = sorted(glob.glob(os.path.join(path, '*.bmp')), key=lambda x: float(re.search("([0-9]*).bmp", x).group(1)))
+image_angle = np.empty(len(files))
+image_dimensions = cv.imread(files[0]).shape[0:2]
+source = np.empty((len(files), *image_dimensions))
+for i, file in enumerate(files):
+    source[i] = cv.cvtColor(cv.imread(file), cv.COLOR_BGR2GRAY)
+    image_angle[i] = float(re.search("([0-9]*).bmp", file).group(1))
 
-img = [
-    rgb2gray(mpimg.imread('data/' + probe_number + '/bfp_bb.bmp')),
-    #mpimg.imread('data/bfp.bmp'),
-    #rgb2gray(mpimg.imread('/data2/fp_bb_dark.bmp'))
-]
+# #%% load test data
+# center = (213, 206)
+# max_radius = 300
+# source = cv.imread('data/spin_hall/polar_remap.png')
+# data = cv.cvtColor(source, cv.COLOR_BGR2GRAY)
 
-def topolar(data, order=1):
-    max_radius = 0.5*np.linalg.norm(data.shape)
+#%% functions
+def get_polar_coordinates(polar_image):
+    rads = np.linspace(0, max_radius, polar_image.shape[1])
+    angs = np.linspace(0, 2 * np.pi, polar_image.shape[0])
+    return angs, rads
 
-    def transform(coords):
-        theta = 2*np.pi*coords[1] / (data.shape[1]) #'- 1.)
-        radius = max_radius * coords[0] / data.shape[0]
+def plot_polar(polar_image):
+    angs, rads = get_polar_coordinates(polar_image)
+    polar_image_swaped = np.swapaxes(polar_image, 0, 1)
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(111, projection='polar')
+    cs = ax1.contourf(angs, rads, polar_image_swaped[:, ::-1], cmap='binary')
+    fig1.colorbar(cs)
+    plt.savefig('test.png', dpi=500)
 
-        i = 0.5*data.shape[0] - radius*np.sin(theta)
-        j = radius*np.cos(theta) + 0.5*data.shape[1]
-        return i, j
 
-    polar = geometric_transform(data, transform, order=order)
-    rads = max_radius * np.linspace(0, 1, data.shape[0])
-    angs = np.linspace(0, 2*np.pi, data.shape[1])
+def plot_radial_profile(polar_image):
+    radial_profile = np.average(polar_image, axis=0)
+    fig, ax = plt.subplots()
+    ax.plot(radial_profile, '.')
+    plt.savefig('test.png', dpi=500)
 
-    return polar, (rads, angs)
+def plot_angular_profile(polar_image):
+    angs, rads = get_polar_coordinates(polar_image)
+    angular_profile = np.average(polar_image, axis=1)
+    fig, ax = plt.subplots()
+    ax.plot(angs, angular_profile, '.')
+    plt.savefig('test.png', dpi=500)
 
-pol, (rads, angs) = topolar(img[0], order=5)
-null_indices = np.where(~pol.any(axis=1))[0]
-pol = np.delete(pol, null_indices, 0)
-rads = np.delete(rads, null_indices)
+def integrate_intensity_of_half_spaces(polar_image, angle, min_rad, max_rad):
+    angs, rads = get_polar_coordinates(polar_image)
+    angle_mask = (angs > angle) & (angs < angle + np.pi)
+    radial_mask = (rads > min_rad) & (rads <max_rad)
+    masked_image = polar_image[:, radial_mask]
+    left = np.mean(masked_image[angle_mask])
+    right = np.mean(masked_image[~angle_mask])
+    return left, right
 
-fig1 = plt.figure()
-ax1 = fig1.add_subplot(111, projection='polar')
-NA = 1.216
-radial_profile = np.average(pol, axis=1, weights= pol >0)
-index_max = np.argmax(radial_profile)
-index_NA = 710
-radial_axis = np.arange(0, NA/index_NA * len(rads), NA/index_NA)
+def plot_difference_of_angles(polar_image1, polar_image2):
+    diff = polar_image2 - polar_image1
+    angs, rads = get_polar_coordinates(diff)
+    diffswaped = np.swapaxes(diff, 0, 1)
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(111, projection='polar')
+    cs = ax1.contourf(angs, rads, diffswaped[:, ::-1], cmap='bwr')
+    fig1.colorbar(cs)
 
-cs = ax1.contourf(angs, radial_axis, pol)
-fig1.colorbar(cs)
-#fig1.safefig('results/' + probe_number + '/polarplot.png')
+
+#%%calculate stuff
+
+polar_image = np.empty_like(source)
+halfspace_intensity = np.empty((len(files), 2))
+
+for i, s in enumerate(source):
+     polar_image[i] = cv.linearPolar(s, center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_CUBIC)
+     halfspace_intensity[i] = integrate_intensity_of_half_spaces(polar_image[i], 0.056, 100, 1000)
+
+
+plt.plot(image_angle, halfspace_intensity[:, 0])
+plt.plot(image_angle, halfspace_intensity[:, 1])
 plt.show()
 
+# for i, pi in enumerate(polar_image):
+#     plot_difference_of_angles(polar_image[i], polar_image[i+9])
+#     plt.savefig("results/diff"+str(i)+'-'+str(i+9) +".png", dpi=300)
 
 
 
-extra_ticks = [radial_axis[index_max], radial_axis[index_NA]]
-fig2, ax2 = plt.subplots()
-ax2.plot(radial_axis, radial_profile, '.')
-ax2.axvline(radial_axis[index_max], linestyle='--', linewidth=0.5)
-ax2.axvline(radial_axis[index_NA], linestyle='--', linewidth=0.5)
-#ax2.set_xticks(list(ax2.get_xticks()) + extra_ticks)
-print(radial_axis[index_max])
-plt.show()
+
+
+
+
+
+
