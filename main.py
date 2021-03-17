@@ -11,6 +11,17 @@ pol_data = np.genfromtxt('data/polorientation.csv', delimiter=',')
 center = [(1238, 1011), (1201, 1128), (1203, 1130)]
 datasetnumber = 2
 
+# %% plot poldata
+
+#
+# fig, ax = plt.subplots()
+# ax.plot(pol_data[:, 0], pol_data[:, 1])
+#
+# ax.set(xlabel='angle of lambda/4 in °', ylabel='power in (mW)',
+#        title='Orientation of lambda/4 (measured after linear polfilter)')
+# ax.grid()
+# fig.savefig("polorientation.png", dpi=400)
+
 
 # center = (563, 338)
 
@@ -114,11 +125,11 @@ def plot_masks(polar_image, mid_angle, angle_width, min_rad, max_rad, remove_ang
     cs = ax1.contourf(angs, rads, polar_image_swaped[:, ::-1], cmap='binary')
     left_mask= sorted(angs[left_mask])
     right_mask = sorted(angs[right_mask])
-    ax1.plot(right_mask, np.full(len(right_mask), min_rad), '-.g', linewidth=0.5)
-    ax1.plot(right_mask, np.full(len(right_mask), max_rad), '-.g', linewidth=0.5)
+    ax1.plot(right_mask, np.full(len(right_mask), min_rad), '-.g', linewidth=0.6)
+    ax1.plot(right_mask, np.full(len(right_mask), max_rad), '-.g', linewidth=0.6)
 
-    ax1.plot(left_mask, np.full(len(left_mask), min_rad), '-.r', linewidth=0.5)
-    ax1.plot(left_mask, np.full(len(left_mask), max_rad), '-.r', linewidth=0.5)
+    ax1.plot(left_mask, np.full(len(left_mask), min_rad), '-.r', linewidth=0.6)
+    ax1.plot(left_mask, np.full(len(left_mask), max_rad), '-.r', linewidth=0.6)
 
 
     #ax1.plot(angs, np.full(angs.shape, 450), linewidth=0.3)
@@ -140,8 +151,8 @@ def plot_difference_of_angles(polar_images, i, j):
 
 # %%calculate stuff
 spin_hall_angle = 0#0.15
-angle_width = np.pi / 2
-remove_angs = np.pi / 8
+angle_width = np.pi / 4
+remove_angs = np.pi / 10
 min_rad = 425
 max_rad = 448
 polar_images = np.empty_like(source)
@@ -158,7 +169,7 @@ plt.plot(image_angle, halfspace_intensity[:, 0], 'g')
 plt.plot(image_angle, halfspace_intensity[:, 1], 'r')
 plt.show()
 
-plot_difference_of_angles(polar_images, 24, 37)
+plot_difference_of_angles(polar_images, 24, 52)
 
 # halfspace_angles = np.linspace(1.25, 1.6, 10)
 # polar_image = np.empty_like(source)
