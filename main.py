@@ -9,6 +9,7 @@ pol_data = np.genfromtxt('data/polorientation.csv', delimiter=',')
 
 #center = (1238, 1011)
 center = (1201, 1128)
+#center = (563, 338)
 max_radius = 500
 # %%load data
 path = 'data/spin_hall/2'
@@ -26,6 +27,9 @@ for i, file in enumerate(files):
 # source = cv.imread('data/spin_hall/polar_remap.png')
 # data = cv.cvtColor(source, cv.COLOR_BGR2GRAY)
 
+# %% load test data
+
+image = cv.cvtColor(cv.imread('data/TestFringe.bmp'), cv.COLOR_BGR2GRAY);
 #%% functions
 def get_polar_coordinates(polar_image):
     rads = np.linspace(0, max_radius, polar_image.shape[1])
@@ -38,8 +42,11 @@ def plot_polar(polar_image):
     fig1 = plt.figure()
     ax1 = fig1.add_subplot(111, projection='polar')
     cs = ax1.contourf(angs, rads, polar_image_swaped[:, ::-1], cmap='binary')
+    ax1.plot(angs, np.full(angs.shape, 430), linewidth=0.3)
+    ax1.plot(angs, np.full(angs.shape, 450), linewidth=0.3)
+    ax1.plot(np.full(rads.shape, np.pi / 4), rads)
     fig1.colorbar(cs)
-    plt.savefig('test.png', dpi=500)
+    plt.show()
 
 
 def plot_radial_profile(polar_image):
@@ -55,13 +62,24 @@ def plot_angular_profile(polar_image):
     ax.plot(angs, angular_profile, '.')
     plt.savefig('test.png', dpi=500)
 
-def integrate_intensity_of_half_spaces(polar_image, angle, min_rad, max_rad):
+def integrate_intensity_of_half_spaces(polar_image, mid_angle, angle_width, min_rad, max_rad):
     angs, rads = get_polar_coordinates(polar_image)
-    angle_mask = (angs > angle) & (angs < angle + np.pi)
+
+    if mid_angle + angle_width < 2 * np.pi:
+        left_angle_mask = (angs >= mid_angle) & (angs <= mid_angle + angle_width)
+    else:
+        left_angle_mask = (angs >= mid_angle) | (angs <= mid_angle + angle_width - (2 * np.pi))
+
+    if mid_angle - angle_width > 0:
+        right_angle_mask = (angs <= mid_angle) & (angs >= mid_angle - angle_width)
+    else:
+        right_angle_mask = (angs <= mid_angle) | (angs >= 2 * np.pi + (mid_angle - angle_width))
+
     radial_mask = (rads > min_rad) & (rads <max_rad)
     masked_image = polar_image[:, radial_mask]
-    left = np.mean(masked_image[angle_mask])
-    right = np.mean(masked_image[~angle_mask])
+    print("left:{0}, right:{1} \n".format(len(masked_image[left_angle_mask]), len(masked_image[right_angle_mask])))
+    left = np.mean(masked_image[left_angle_mask])
+    right = np.mean(masked_image[right_angle_mask])
     return left, right
 
 def plot_difference_of_angles(polar_image1, polar_image2):
@@ -70,18 +88,18 @@ def plot_difference_of_angles(polar_image1, polar_image2):
     diffswaped = np.swapaxes(diff, 0, 1)
     fig1 = plt.figure()
     ax1 = fig1.add_subplot(111, projection='polar')
-    cs = ax1.contourf(angs, rads, diffswaped[:, ::-1], cmap='bwr')
+    cs = ax1.contourf(angs, rads, diffswaped[:, ::-1], cmap='RdBu')
     fig1.colorbar(cs)
 
 
 #%%calculate stuff
 
+polar_image = cv.linearPolar(source[0], center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_NEAREST)
 polar_image = np.empty_like(source)
 halfspace_intensity = np.empty((len(files), 2))
-
 for i, s in enumerate(source):
-     polar_image[i] = cv.linearPolar(s, center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_CUBIC)
-     halfspace_intensity[i] = integrate_intensity_of_half_spaces(polar_image[i], 0.056, 100, 1000)
+     polar_image[i] = cv.linearPolar(s, center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_NEAREST)
+     halfspace_intensity[i] = integrate_intensity_of_half_spaces(polar_image[i], 0.109, np.pi / 6,  272, 282)
 
 
 plt.plot(image_angle, halfspace_intensity[:, 0])
