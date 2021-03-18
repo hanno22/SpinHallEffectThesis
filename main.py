@@ -1,11 +1,9 @@
 # %%import libraries
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
 from models import SpinHallDataSet as sh, Lambda4OrientationDataSet as lo
 
 # %%declare constants
-#mpl.rcParams['figure.dpi'] = 300
 center = [(1238, 1011), (1201, 1128), (1203, 1130), (1199, 1123)]
 k_0_NA = 12.07
 r_NA = 504
