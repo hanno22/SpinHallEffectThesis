@@ -5,7 +5,7 @@ from models import SpinHallDataSet as sh, Lambda4OrientationDataSet as lo
 
 # %%declare constants
 center = [(1238, 1011), (1201, 1128), (1203, 1130), (1199, 1123)]
-k_0_NA = 12.07
+k_0_NA = 12.07  # in \mu m^{-1}
 r_NA = 504
 dataset_number = 0
 max_radius = 600
