@@ -1,81 +1,52 @@
+# %%import libraries
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from scipy.ndimage.interpolation import geometric_transform
+import matplotlib as mpl
 import numpy as np
-import cv2 as cv
+from models import SpinHallDataSet as sh, Lambda4OrientationDataSet as lo
 
+# %%declare constants
+#mpl.rcParams['figure.dpi'] = 300
+center = [(1238, 1011), (1201, 1128), (1203, 1130), (1199, 1123)]
+k_0_NA = 12.07
+r_NA = 504
+dataset_number = 0
+max_radius = 600
+spin_hall_angle = 0  # 0.15
+angle_width = 3 / 4 * np.pi
+angle_gap = np.pi / 4
+min_rad = 425
+max_rad = 448
 
-img = cv.imread('data/2/bfp_bb.bmp', 0)
-#img = cv.medianBlur(img, 15)
-cimg = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+# %%load data
+sh_data_set = sh.SpinHallDataSet('data/spin_hall/{0}'.format(dataset_number), center[dataset_number], max_radius,
+                                 k_0_NA, r_NA)
+lo_data_set = lo.Lambda4OrientationDataSet('data/polorientation.csv')
 
-circles = cv.HoughCircles(img, cv.HOUGH_GRADIENT, 1, 10, param1=30, param2=20, minRadius=410, maxRadius=430)
-
-circles = np.uint16(np.around(circles))
-for i in circles[0,:]:
-    # draw the outer circle
-    cv.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
-    # draw the center of the circle
-    cv.circle(img,(i[0],i[1]),2,(0,0,255),3)
-
-# cv.imshow('detected circles',img)
-# cv.waitKey(0)
-# cv.destroyAllWindows()
-# probe_number = '1'
-# def rgb2gray(rgb):
-#     return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
-#
-# img = [
-#     rgb2gray(mpimg.imread('data/' + probe_number + '/bfp_bb.bmp')),
-#     #mpimg.imread('data/bfp.bmp'),
-#     #rgb2gray(mpimg.imread('/data2/fp_bb_dark.bmp'))
-# ]
-
-def topolar(data, center, order=1):
-    max_radius = 0.5*np.linalg.norm(data.shape)
-
-    def transform(coords):
-        theta = 2*np.pi*coords[1] / (data.shape[1]) #- 1.)
-        radius = max_radius * coords[0] / data.shape[0]
-
-        i = data.shape[0] - radius*np.sin(theta) - center[0]
-        j = radius*np.cos(theta) + data.shape[1] - center[1]
-        return i, j
-
-    polar = geometric_transform(data, transform, order=order)
-    rads = max_radius * np.linspace(0, 1, data.shape[0])
-    angs = np.linspace(0, 2*np.pi, data.shape[1])
-
-    return polar, (rads, angs)
-
-pol, (rads, angs) = topolar(img, center= (100,100), order=5)
-plt.imshow(img)
-plt.show()
-null_indices = np.where(~pol.any(axis=1))[0]
-pol = np.delete(pol, null_indices, 0)
-rads = np.delete(rads, null_indices)
-
-fig1 = plt.figure()
+# %%plot
+fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='polar')
-NA = 1.216
-radial_profile = np.average(pol, axis=1, weights= pol >0)
-index_max = np.argmax(radial_profile)
-index_NA = 710
-radial_axis = np.arange(0, NA/index_NA * len(rads), NA/index_NA)
+sh_data_set.plot_polar_diff(45, 135, fig1, ax1)
 
-cs = ax1.contourf(angs, radial_axis, pol, cmap='binary')
-fig1.colorbar(cs)
-#fig1.safefig('results/' + probe_number + '/polarplot.png')
-plt.show()
+sh_data_set.plot_masks(spin_hall_angle, angle_width, angle_gap, min_rad, max_rad, fig1, ax1)
+legend_angle = np.deg2rad(67.5)
+fig1.legend(loc="lower left")
+fig1.savefig('results/polar_diff_mask{0}.png'.format(dataset_number), dpi=300)
+fig1.show()
 
+fig2 = plt.figure(2)
+ax2 = fig2.add_subplot(111)
+sh_data_set.plot_integrated_intensity(spin_hall_angle, angle_width, angle_gap, min_rad, max_rad, fig2, ax2)
+ax3 = ax2.twinx()
+lo_data_set.plot_orientation(fig2, ax3)
+fig2.tight_layout
+fig2.legend(loc="upper left", mode="expand", ncol=2)
+fig2.savefig('results/integrated_intesity{0}.png'.format(dataset_number), dpi=300)
+fig2.show()
 
+# fig3 = plt.figure(3)
+# ax4 = fig3.add_subplot(111)
+# sh_data_set.plot_cart_diff(34, 135, fig3, ax4)
+# fig3.show()
 
-
-extra_ticks = [radial_axis[index_max], radial_axis[index_NA]]
-fig2, ax2 = plt.subplots()
-ax2.plot(radial_axis, radial_profile, '.')
-ax2.axvline(radial_axis[index_max], linestyle='--', linewidth=0.5)
-ax2.axvline(radial_axis[index_NA], linestyle='--', linewidth=0.5)
-#ax2.set_xticks(list(ax2.get_xticks()) + extra_ticks)
-print(radial_axis[index_max])
-plt.show()
+# data_set.plot_angular_profile(32, fig, ax)
+#plt.show()
