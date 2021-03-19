@@ -98,6 +98,7 @@ class SpinHallDataSet:
     def __plot_cart_data(self, cart_data, fig, ax, cmap='binary'):
         cs = ax.imshow(cart_data, cmap=cmap)
         fig.colorbar(cs)
+
     def plot_cart(self, lambda_4_angle, fig, ax):
         angle, idx = self.__get_lambda_4_index(lambda_4_angle)
         self.__plot_cart_data(self.data[idx], fig, ax)
