@@ -43,12 +43,12 @@ lo_data_set = lo.Lambda4OrientationDataSet('data/polorientation.csv')
 # fig2.show()
 
 
-result = lo_data_set.fit()
-Ex, Ex_j, Ey, Ey_j = result.x
-resultJonesVector = np.array([Ex + 1j * Ex_j, Ey + 1j * Ey_j])
-fig, ax = plt.subplots()
-#lo_data_set.plot_jones_vector_ellipse(resultJonesVector, fig, ax)
-#vectors = lo_data_set.polarimeter_simulation(resultJonesVector)
-lo_data_set.plot_jones_fit(resultJonesVector, fig, ax)
-#lo_data_set.plot_jones_vector_ellipse(resultJonesVector, fig, ax)
+
+jones_vector, dia_offset = lo_data_set.fit()
+fig, axs = plt.subplots(2,1)
+lo_data_set.plot_jones_vector_ellipse(jones_vector, fig, axs[0])
+
+
+lo_data_set.plot_jones_fit(jones_vector, dia_offset, fig, axs[1])
+fig.show()
 plt.show()
