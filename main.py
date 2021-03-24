@@ -19,30 +19,12 @@ max_rad = 448
 # %%load data
 # sh_data_set = sh.SpinHallDataSet('data/spin_hall/{0}'.format(dataset_number), center[dataset_number], max_radius,
 #                                  k_0_NA, r_NA)
-#lo_data_set = lo.Lambda4OrientationDataSet('data/polorientation.csv')
+lo_data_set = lo.Lambda4OrientationDataSet('data/polorientation.csv')
 
 gold_dielectric_function = gd.GoldDielectricFunction('data/Olmon_PRB2012_EV.dat')
+
 fig, ax = plt.subplots()
-gold_dielectric_function.plot_k_spp(1.52**2, fig, ax)
-gold_dielectric_function.plot_k_spp(1 ** 2, fig, ax)
-ax.axhline(con.c * con.h / 633e-9 / con.eV, ls= '-.', color='k', label="E(633nm)")
-ax.legend()
-#ax.grid()
-# inset axes....
-axins = ax.inset_axes([0.6, 0.03, 0.5, 0.5])
-gold_dielectric_function.plot_k_spp(1.52**2, fig, axins)
-gold_dielectric_function.plot_k_spp(1 ** 2, fig, axins)
-axins.axhline(con.c * con.h / 633e-9 / con.e, ls= '-.', color='k', label="E(633nm)")
-# sub region of the original image
-x1, x2, y1, y2 = 9, 18, 1.3, 2.6
-axins.set_xlim(x1, x2)
-axins.set_ylim(y1, y2)
-axins.set_xticklabels('')
-axins.set_yticklabels('')
-ax.indicate_inset_zoom(axins)
-ax.set(xlabel='$\Re(k_{spp}) / \mu m^{-1}$',  ylabel='E / eV')
-#ax.set_ylim(1.5, 2.5)
-#plt.show()
+gold_dielectric_function.full_plot(fig, ax)
 fig.savefig('results/dispersion.png', dpi = 300)
 # %%plot spin_hall_data
 # fig1 = plt.figure(1)
