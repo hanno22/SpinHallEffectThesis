@@ -56,7 +56,7 @@ class JonesVector(np.ndarray):
         y_alpha = a * np.array([np.sin(alpha + np.pi), np.sin(alpha)])
         x_alpha_pi_2 = b * np.array([np.cos(alpha + np.pi / 2 + np.pi), np.cos(alpha + np.pi / 2)])
         y_alpha_pi_2 = b * np.array([np.sin(alpha + np.pi / 2 + np.pi), np.sin(alpha + np.pi / 2)])
-        # ax.axis('square')
+        #ax.axis('square')
         ax.plot(x_alpha, y_alpha, 'r--')
         ax.plot(x_alpha_pi_2, y_alpha_pi_2, 'r--')
         ax.axis('equal')
