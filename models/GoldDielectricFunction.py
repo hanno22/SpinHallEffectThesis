@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.constants as con
-
+from scipy.interpolate import interp1d
 
 class GoldDielectricFunction:
     def __init__(self, data_path):
@@ -12,20 +12,28 @@ class GoldDielectricFunction:
                              delimiter='	')
         self.E = data[:, 0]
         self.omega = self.E * con.e / con.hbar
-        #self.wavelength = data[:, 1]
+        # self.wavelength = data[:, 1]
         self.eps = data[:, 2] + 1j * data[:, 3]
         self.n = data[:, 4]
         self.k = data[:, 5]
         self.k_0 = self.omega / con.speed_of_light
+        self.real_interpolated = interp1d(self.E, self.eps.real)
+        self.imag_interpolated = interp1d(self.E, self.eps.imag)
+
+    def eps_interpolated(self, energy):
+        return self.real_interpolated(energy) + 1j * self.imag_interpolated(energy)
 
     def k_spp(self, eps_d):
-        return self.omega / con.c * np.sqrt(eps_d * self.eps / (eps_d + self.eps))
+        return self.omega / con.c * self.n_eff(eps_d)
+
+    def n_eff(self, eps_d):
+        return np.lib.scimath.sqrt(eps_d * self.eps / (eps_d + self.eps))
 
     def plot_k_spp(self, eps_d, fig, ax):
         k_spp = self.k_spp(eps_d) * 1e-6
         color = next(ax._get_lines.prop_cycler)['color']
         ax.scatter(k_spp.real, self.E, color=color, marker='.', label='$\\epsilon_D = {:.2f}$'.format(eps_d))
-        ax.plot(self.k_0 * np.sqrt(eps_d) * 1e-6 , self.E, color=color, linestyle='--')
+        ax.plot(self.k_0 * np.sqrt(eps_d) * 1e-6, self.E, color=color, linestyle='--')
 
     def full_plot(self, fig, ax):
         self.plot_k_spp(1.52 ** 2, fig, ax)
@@ -46,4 +54,3 @@ class GoldDielectricFunction:
         axins.set_yticklabels('')
         ax.indicate_inset_zoom(axins)
         ax.set(xlabel='$\Re(k_{spp}) / \mu m^{-1}$', ylabel='E / eV')
-

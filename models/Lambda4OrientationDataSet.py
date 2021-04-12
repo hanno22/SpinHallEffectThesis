@@ -25,8 +25,8 @@ class Lambda4OrientationDataSet:
         return self.measured_intensities - self.__get_intensities(model_jones_vectors)
 
     def fit(self, tol=1e-12):
-        sup_limit = np.array(np.array([10, 10, 10, 10, np.pi]))
-        inf_limit = np.array(np.array([-10, -10, -10, -10, -np.pi]))
+        sup_limit = np.array([10, 10, 10, 10, np.pi])
+        inf_limit = np.array([-10, -10, -10, -10, -np.pi])
         x_0 = (1, 0, 0, 0, 0)  # np.random.rand(4) * sup_limit
         result = least_squares(fun=self.__intensity_diff, x0=x_0, bounds=(inf_limit, sup_limit), ftol=tol, xtol=tol,
                                gtol=tol)
