@@ -9,19 +9,19 @@ from models import SpinHallDataSet as sh, Lambda4OrientationDataSet as lo, GoldD
 center = [(1238, 1011), (1201, 1128), (1203, 1130), (1199, 1123), (1234, 995), (1302, 1046)]
 k_0_NA = 12.07  # in $\mu m^{-1}$
 r_NA = 502#512
-dataset_number = 5
+dataset_number = 4
 max_radius = 600
 spin_hall_angle = np.deg2rad(0)
-angle_width = np.deg2rad(30)#np.deg2rad(170)
-angle_gap = np.deg2rad(5)#np.deg2rad(120)
+angle_width = np.deg2rad(30) #np.deg2rad(30)
+angle_gap = np.deg2rad(5) #np.deg2rad(5)
 min_rad = 429
 max_rad = 450
 
 # %%load data
 sh_data_set = sh.SpinHallDataSet('data/spin_hall/{0}'.format(dataset_number), center[dataset_number], max_radius,
-                              k_0_NA, r_NA, lamb_offset=2)
-#lo_data_set = lo.Lambda4OrientationDataSet('data/polorientation.csv')
-gold_dielectric_function = gd.GoldDielectricFunction('data/Olmon_PRB2012_EV.dat')
+                              k_0_NA, r_NA, 45.3, lamb_offset=2)
+lo_data_set = lo.Lambda4OrientationDataSet('data/polorientation.csv')
+#gold_dielectric_function = gd.GoldDielectricFunction('data/Olmon_PRB2012_EV.dat')
 
 def example():
 
@@ -97,11 +97,15 @@ def polarimeter():
     # jones_vector = JonesVector([1, -2])
     # dia_offset = 0
     fig4, axs4 = plt.subplots(2, 1, constrained_layout=True)
-    fig4.suptitle('diattenuator angle = {:.1f}'.format(np.rad2deg(dia_offset)))
+    #fig4.suptitle('diattenuator angle = {:.1f}'.format(np.rad2deg(dia_offset)))
     jones_vector.plot_ellipsis(fig4, axs4[0])
-    b = jones_vector.alpha
+    print(jones_vector)
+    print(f'ellipticity{jones_vector.ellipticity}')
+    print(f'alpha{jones_vector.alpha}')
+    print(f'intensity{jones_vector.intensity}')
+    print(f'delta{jones_vector.delta}')
     lo_data_set.plot_jones_fit(jones_vector, dia_offset, fig4, axs4[1])
-    fig4.savefig('results/polarimeter.png', dpi=300)
+    fig4.savefig('results/graph_polarimeter.pdf')
     fig4.show()
 
 def dirt():
@@ -127,8 +131,38 @@ def lorentz_plot():
     fig.savefig('results/lorenz_profile.pdf')
     fig.show()
 
+def polar_plots(angles):
+    for ang in angles:
+        fig = plt.figure()  # figsize=(6.4/1.2, 4.8/1.2))
+        ax = fig.add_subplot(111, projection='polar')
+        sh_data_set.plot_polar(ang, fig, ax)
+        fig.show()
+        fig.savefig('results/polar_{0}.png'.format(ang), dpi=300)
 
+#polar_plots([0,45,90,135])
 #example()
 #spin_hall()
-dirt()
+#dirt()
+
+#polarimeter()
+fig1, ax1 = plt.subplots()
+#sh_data_set.plot_fp_diff(45, 135, fig, ax)
+sh_data_set.plot_fp(0, fig1, ax1)
+fig1.savefig('results/fp_0.png', dpi=300)
+
+fig2, ax2 = plt.subplots()
+sh_data_set.plot_fp(45, fig2, ax2)
+fig2.savefig('results/fp_45.png', dpi=300)
+
+fig3, ax3 = plt.subplots()
+sh_data_set.plot_fp(135, fig3, ax3)
+fig3.savefig('results/fp_135.png', dpi=300)
+
+fig4, ax4 = plt.subplots()
+sh_data_set.plot_fp_diff(110, 160, fig4, ax4)
+fig4.savefig('results/diff_fp_110_160.png', dpi=300)
+
+fig5, ax5 = plt.subplots()
+sh_data_set.plot_fp(90, fig5, ax5)
+fig5.savefig('results/fp_90.png', dpi=300)
 

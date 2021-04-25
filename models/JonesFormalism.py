@@ -60,13 +60,13 @@ class JonesVector(np.ndarray):
         ax.plot(x_alpha, y_alpha, 'r--')
         ax.plot(x_alpha_pi_2, y_alpha_pi_2, 'r--')
         ax.axis('equal')
-        ax.set_xlabel('$E_x$')
-        ax.set_ylabel('$E_y$')
+        ax.set_xlabel('$E_x$ / AU')
+        ax.set_ylabel('$E_y$ / AU')
         ax.grid()
-        ax.text(0.5, 0.9,
-                '$\\delta$={:.1f}°, $\\alpha$={:.1f}°, ellipticity={:.1f}'.format(np.rad2deg(delta), np.rad2deg(alpha),
-                                                                                  ellipticity),
-                ha='center', va='center', transform=ax.transAxes)
+        #ax.text(0.5, 0.9,
+        #        '$\\delta$={:.1f}°, $\\alpha$={:.1f}°, ellipticity={:.1f}'.format(np.rad2deg(delta), np.rad2deg(alpha),
+        #                                                                          ellipticity),
+        #        ha='center', va='center', transform=ax.transAxes)
         ax.plot(x, y)
 
 

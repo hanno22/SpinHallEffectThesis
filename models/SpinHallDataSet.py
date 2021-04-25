@@ -8,11 +8,13 @@ from scipy.optimize import least_squares
 
 class SpinHallDataSet:
 
-    def __init__(self, data_path, center, max_radius, k_0_NA, r_NA, lamb_offset=0):
+    def __init__(self, data_path, center, max_radius, k_0_NA, r_NA, fp_scale, lamb_offset=0):
         self.center = center
         self.max_radius = max_radius
         self.__k_0_NA = k_0_NA
         self.__r_NA = r_NA
+        fp_mid = (1426, 1066)
+        fp_size = 250
 
         # self.lamb_offset = lamb_offset
 
@@ -23,16 +25,35 @@ class SpinHallDataSet:
                        key=get_angle_from_file_name)
         self.lambda_4_angles = np.empty(len(files))
         self.__data_dimensions = cv.imread(files[0]).shape[0:2]
+
+        self.__data_dimensions_fp = (fp_size * 2, fp_size * 2)
         self.data = np.empty((len(files), *self.__data_dimensions))
         self.polar_data = np.empty_like(self.data)
+
+        fp_files = sorted(glob.glob(data_path + '/fp/'+ '[0-9]*.bmp'))
+        self.fp_data = np.empty((len(fp_files), *self.__data_dimensions_fp))
+        self.fp_lambda_4_angles = np.empty(len(fp_files))
 
         for i, file in enumerate(files):
             self.data[i] = cv.cvtColor(cv.imread(file), cv.COLOR_BGR2GRAY)
             self.lambda_4_angles[i] = get_angle_from_file_name(file)
             self.polar_data[i] = cv.linearPolar(self.data[i], center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_CUBIC)
 
+        for i, fp_file in enumerate(fp_files):
+            self.fp_data[i] = cv.cvtColor(cv.imread(fp_file), cv.COLOR_BGR2GRAY)[fp_mid[1]-fp_size:fp_mid[1]+fp_size, fp_mid[0]-fp_size:fp_mid[0]+fp_size]
+            self.fp_lambda_4_angles[i] = get_angle_from_file_name(fp_file)
+            #self.polar_data[i] = cv.linearPolar(self.data[i], center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_CUBIC)
+
         self.lambda_4_angles = np.where(self.lambda_4_angles - lamb_offset > 0, self.lambda_4_angles - lamb_offset,
                                         360 + self.lambda_4_angles - lamb_offset)
+
+        self.fp_lambda_4_angles = np.where(self.fp_lambda_4_angles - lamb_offset > 0, self.fp_lambda_4_angles - lamb_offset,
+                                        360 + self.fp_lambda_4_angles - lamb_offset)
+
+        self.x_values = np.linspace(0, self.__data_dimensions_fp[1] / fp_scale, self.__data_dimensions_fp[1])
+        self.y_values = np.linspace(0, self.__data_dimensions_fp[0] / fp_scale, self.__data_dimensions_fp[0])
+        self.x_values = self.x_values - self.x_values[-1] / 2
+        self.y_values = self.y_values - self.y_values[-1] / 2
         self.radial_values = np.linspace(0, self.max_radius, self.__data_dimensions[1])
         self.__k_factor = self.__k_0_NA / self.__r_NA
         self.radial_values_k = np.linspace(0, self.max_radius * self.__k_factor, self.__data_dimensions[1])
@@ -109,19 +130,21 @@ class SpinHallDataSet:
             scale_ax.set_ylabel('$|\\vec{k}_{\\bot}|$ / $\\mu m^{-1}$')
 
         swapped_data = np.swapaxes(polar_data, 0, 1)
-        clev = np.arange(0, 1, .01)
+        clev = np.arange(-0.5, 0.5, .01)
         cs = ax.contourf(self.angular_values, self.radial_values_k, swapped_data[:, ::-1], clev, cmap=cmap)
         cbar = fig.colorbar(cs)
-        cbar.set_label('Intensity / AU', rotation=90)
+        cbar.set_label('relative intensity difference / AU', rotation=90)
         ax.plot(self.angular_values, np.full(len(self.angular_values), self.__k_0_NA), label='$k_0\\mathrm{NA}$',
                 color='r', linestyle='--')
         # label_position = ax.get_rlabel_position()
         # ax.text(np.radians(label_position + 15), ax.get_rmax() / 2., '$|\\vec{k}|$ in $\\mu m^{-1}$',
         #        rotation=label_position, ha='center', va='center', color='silver')
+        ax.set_ylim(9.5, self.__k_0_NA)
+        ax.set_rorigin(9)
         add_scale(ax)
         ax.set_yticklabels([])
         #ax.set_ylim(0, self.__k_0_NA)
-        ax.legend()
+        #ax.legend()
         # fig.tight_layout()
 
     def __plot_cart_data(self, cart_data, fig, ax, cmap='plasma'):
@@ -156,7 +179,7 @@ class SpinHallDataSet:
 
     def __calc_radial_profile(self, lambda_4_angle):
         angle, idx = self.__get_lambda_4_index(lambda_4_angle)
-        return np.average(self.polar_data[idx], axis=0);
+        return np.average(self.polar_data[idx], axis=0)
 
     def plot_radial_profile(self, lambda_4_angle, fig, ax):
         radial_profile = self.__calc_radial_profile(lambda_4_angle)
@@ -251,3 +274,31 @@ class SpinHallDataSet:
         # lin = np.array([0, 90, 180, 270])
         for c in circ:
             ax.axvline(x=c, linestyle='--', color='k', linewidth='0.5')
+
+
+    def plot_fp_diff(self, lambda_4_angle_1, lambda_4_angle_2, fig, ax):
+        angle1, idx1 = self.__get_fp_lambda_4_index(lambda_4_angle_1)
+        angle2, idx2 = self.__get_fp_lambda_4_index(lambda_4_angle_2)
+        diff = (self.fp_data[idx1] - self.fp_data[idx2]) / (self.fp_data[idx1] + self.fp_data[idx2])
+        range_diff = np.max([np.abs(np.min(diff)), np.abs(np.max(diff))])
+        clev = np.arange(-1, 1, 0.01)
+        cs = ax.contourf(self.x_values, self.y_values, diff, clev, cmap='bwr')
+        ax.set(xlabel='$x / \\mathrm{\\mu m}$', ylabel='$y / \\mathrm{\\mu m}$', aspect='equal')
+        cbar = fig.colorbar(cs)
+        cbar.set_label('relative intensity difference', rotation=90)
+        fig.tight_layout()
+    def plot_fp(self, lambda_4_angle, fig, ax):
+        angle, idx = self.__get_fp_lambda_4_index(lambda_4_angle)
+        clev = np.arange(0, 1, 0.01)
+        cs = ax.contourf(self.x_values, self.y_values, self.fp_data[idx] / np.max(self.fp_data[idx]), clev, cmap='plasma')
+        ax.set(xlabel='$x / \\mathrm{\\mu m}$', ylabel='$y / \\mathrm{\\mu m}$', aspect='equal')
+        cbar = fig.colorbar(cs)
+        cbar.set_label('intensity', rotation=90)
+        ax.axvline(x=0, linestyle='-', color='w')
+        ax.axhline(y=0, linestyle='-', color='w')
+        fig.tight_layout()
+
+    def __get_fp_lambda_4_index(self, lambda_4_angle):
+        idx = (np.abs(self.fp_lambda_4_angles - lambda_4_angle)).argmin()
+        return self.fp_lambda_4_angles[idx], idx
+
