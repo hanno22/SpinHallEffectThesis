@@ -48,12 +48,13 @@ class Lambda4OrientationDataSet:
 
 
     def plot_jones_fit(self, jones_vector, dia_offset, fig, ax):
-        ax.plot(np.rad2deg(self.retarder_angles), self.measured_intensities, '+', label="measured")
+        ax.plot(np.rad2deg(self.retarder_angles), self.measured_intensities, '+', label="Messdaten")
         sim_vectors = self.polarimeter_simulation(jones_vector, dia_offset)
         sim_int = self.__get_intensities(sim_vectors)
         ax.set(ylabel='$P$ in mW', xlabel='$\\alpha_{\\lambda/4}$ in deg', xticks=[0, 45, 90, 135, 180, 135, 180, 225, 270, 315, 360])
-        ax.plot(np.rad2deg(self.retarder_angles), sim_int, '--', label="model")
+        ax.plot(np.rad2deg(self.retarder_angles), sim_int, '--', label="Simulation")
         circ = np.array([45, 135, 225, 315])
+        ax.legend(loc='upper right')
         for c in circ:
             ax.axvline(x=c, linestyle='--', color='k', linewidth='0.5')
 

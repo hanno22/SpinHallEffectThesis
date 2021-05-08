@@ -4,6 +4,7 @@ import glob
 import os
 import re
 from scipy.optimize import least_squares
+from scipy.signal import savgol_filter
 
 
 class SpinHallDataSet:
@@ -30,30 +31,14 @@ class SpinHallDataSet:
         self.data = np.empty((len(files), *self.__data_dimensions))
         self.polar_data = np.empty_like(self.data)
 
-        fp_files = sorted(glob.glob(data_path + '/fp/'+ '[0-9]*.bmp'))
-        self.fp_data = np.empty((len(fp_files), *self.__data_dimensions_fp))
-        self.fp_lambda_4_angles = np.empty(len(fp_files))
-
         for i, file in enumerate(files):
             self.data[i] = cv.cvtColor(cv.imread(file), cv.COLOR_BGR2GRAY)
             self.lambda_4_angles[i] = get_angle_from_file_name(file)
             self.polar_data[i] = cv.linearPolar(self.data[i], center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_CUBIC)
 
-        for i, fp_file in enumerate(fp_files):
-            self.fp_data[i] = cv.cvtColor(cv.imread(fp_file), cv.COLOR_BGR2GRAY)[fp_mid[1]-fp_size:fp_mid[1]+fp_size, fp_mid[0]-fp_size:fp_mid[0]+fp_size]
-            self.fp_lambda_4_angles[i] = get_angle_from_file_name(fp_file)
-            #self.polar_data[i] = cv.linearPolar(self.data[i], center, max_radius, cv.WARP_FILL_OUTLIERS, cv.INTER_CUBIC)
-
         self.lambda_4_angles = np.where(self.lambda_4_angles - lamb_offset > 0, self.lambda_4_angles - lamb_offset,
                                         360 + self.lambda_4_angles - lamb_offset)
 
-        self.fp_lambda_4_angles = np.where(self.fp_lambda_4_angles - lamb_offset > 0, self.fp_lambda_4_angles - lamb_offset,
-                                        360 + self.fp_lambda_4_angles - lamb_offset)
-
-        self.x_values = np.linspace(0, self.__data_dimensions_fp[1] / fp_scale, self.__data_dimensions_fp[1])
-        self.y_values = np.linspace(0, self.__data_dimensions_fp[0] / fp_scale, self.__data_dimensions_fp[0])
-        self.x_values = self.x_values - self.x_values[-1] / 2
-        self.y_values = self.y_values - self.y_values[-1] / 2
         self.radial_values = np.linspace(0, self.max_radius, self.__data_dimensions[1])
         self.__k_factor = self.__k_0_NA / self.__r_NA
         self.radial_values_k = np.linspace(0, self.max_radius * self.__k_factor, self.__data_dimensions[1])
@@ -112,7 +97,7 @@ class SpinHallDataSet:
         right = np.sum(radial_masked_data[right_mask]) / left_right
         return left, right
 
-    def __plot_polar_data(self, polar_data, fig, ax, cmap='plasma'):
+    def __plot_polar_data(self, polar_data, label, clev, fig, ax, zoom=False, cmap='plasma'):
         X_OFFSET = 0
 
         def add_scale(x):
@@ -127,20 +112,20 @@ class SpinHallDataSet:
             scale_ax.spines['left'].set_bounds(*x.get_ylim())
             scale_ax.set_yticks(x.get_yticks())
             scale_ax.set_ylim(x.get_rorigin(), x.get_rmax())
-            scale_ax.set_ylabel('$|\\vec{k}_{\\bot}|$ / $\\mu m^{-1}$')
+            scale_ax.set_ylabel('$|\\vec{k}_{\\parallel}|$ / $\\mu m^{-1}$')
 
         swapped_data = np.swapaxes(polar_data, 0, 1)
-        clev = np.arange(-0.5, 0.5, .01)
         cs = ax.contourf(self.angular_values, self.radial_values_k, swapped_data[:, ::-1], clev, cmap=cmap)
         cbar = fig.colorbar(cs)
-        cbar.set_label('relative intensity difference / AU', rotation=90)
+        cbar.set_label(label, rotation=90)
         ax.plot(self.angular_values, np.full(len(self.angular_values), self.__k_0_NA), label='$k_0\\mathrm{NA}$',
                 color='r', linestyle='--')
         # label_position = ax.get_rlabel_position()
         # ax.text(np.radians(label_position + 15), ax.get_rmax() / 2., '$|\\vec{k}|$ in $\\mu m^{-1}$',
         #        rotation=label_position, ha='center', va='center', color='silver')
-        ax.set_ylim(9.5, self.__k_0_NA)
-        ax.set_rorigin(9)
+        if(zoom):
+            ax.set_ylim(9.5, self.__k_0_NA)
+            ax.set_rorigin(9)
         add_scale(ax)
         ax.set_yticklabels([])
         #ax.set_ylim(0, self.__k_0_NA)
@@ -163,17 +148,21 @@ class SpinHallDataSet:
         self.__plot_cart_data(diff, fig, ax, cmap="bwr")
         ax.set_title('Diff, Lambda/4 angle1: {0} - angle2: {1}'.format(angle1, angle2))
 
-    def plot_polar(self, lambda_4_angle, fig, ax):
+    def plot_polar(self, lambda_4_angle, fig, ax, zoom = False):
         angle, idx = self.__get_lambda_4_index(lambda_4_angle)
         max_value = np.max(self.polar_data[idx])
-        self.__plot_polar_data(self.polar_data[idx] / max_value, fig, ax)
+        clev = np.arange(0, 1.0, .01)
+        label = '$I_k\\left(|\\vec{k_\parallel}|, \phi, \\alpha_{\lambda /4} =' + f'{lambda_4_angle}' + '^\circ\\right) / $AU'
+        self.__plot_polar_data(self.polar_data[idx] / max_value, label, clev, fig, ax, zoom=zoom)
         # ax.set_title('Lambda/4 angle= {0}°'.format(angle))
 
     def plot_polar_diff(self, lambda_4_angle_1, lambda_4_angle_2, fig, ax):
         angle1, idx1 = self.__get_lambda_4_index(lambda_4_angle_1)
         angle2, idx2 = self.__get_lambda_4_index(lambda_4_angle_2)
         diff = (self.polar_data[idx1] - self.polar_data[idx2]) / (self.polar_data[idx1] + self.polar_data[idx2])
-        self.__plot_polar_data(diff, fig, ax, cmap="bwr")
+        clev = np.arange(-0.5, 0.5, .01)
+        label = '$D_k\\left(|\\vec{k_\parallel}|, \Phi\\right)$'
+        self.__plot_polar_data(diff, label, clev, fig, ax, zoom=True, cmap="bwr")
 
         # ax.set_title('Diff, Lambda/4 angle1: {0} - angle2: {1}'.format(angle1, angle2))
 
@@ -187,12 +176,15 @@ class SpinHallDataSet:
         max_index = np.argmax(radial_profile)
         xmax = self.radial_values_k[max_index]
         # ymax = radial_profile[max_index]
-        ax.plot(self.radial_values_k, radial_profile / radial_profile[max_index], color='k')
-        ax.set(xticks=[0, xmax, self.__k_0_NA], xlabel='$|\\vec{k}_{\\bot}| / \\mathrm{\mu m}^{-1}$',
-               ylabel='intensity / AU')
+        ax.plot(self.radial_values_k, radial_profile / radial_profile[max_index], color='k', label='$P_k\\left(|\\vec{k}_{\\parallel}|\\right)$')
+        ax.set(xticks=[0, xmax, self.__k_0_NA], xlabel='$|\\vec{k}_{\\parallel}| / \\mathrm{\\mu m}^{-1}$',
+               ylabel='$P_k(|\\vec{k}_{\\parallel}|) /$ AU')
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(45)
         ax.axvline(x=xmax, linestyle='-.', color='b', linewidth='0.7', label='$k_{\\mathrm{spp}}$')
         ax.axvline(x=self.__k_0_NA, linestyle='--', color='r', linewidth='0.7', label='$k_0\\mathrm{NA}$')
         ax.legend()
+        fig.tight_layout()
         # ax.set_title('RadialProfile, Lambda/4 angel{0}'.format(angle))
 
     def plot_lorenz_fit_radial_profile(self, lambda_4_angle, k_interv, fig, ax):
@@ -220,21 +212,57 @@ class SpinHallDataSet:
         #self.plot_radial_profile(lambda_4_angle, fig, ax)
         rad_max = np.max(radial_profile)
 
-        ax.plot(self.radial_values_k, radial_profile/ rad_max, 'k')
+        ax.plot(self.radial_values_k, radial_profile/ rad_max, 'k', label='$P_k\\left(|\\vec{k}_{\\parallel}|\\right)$')
         ax.plot(self.radial_values_k[id_min:id_max],
                 lorenz_profile(self.radial_values_k[id_min:id_max], c1, c2, k_spp_r, k_spp_i) / rad_max, 'b--', label='Lorentz Fit')
-        ax.set(xticks=[0, k_spp_r, self.__k_0_NA], xlabel='$|\\vec{k}_{\\bot}| / \\mathrm{\mu m}^{-1}$',
-               ylabel='intensity / AU', xlim=(9, 13))
+        ax.set(xticks=[0, k_spp_r, self.__k_0_NA], xlabel='$|\\vec{k}_{\\parallel}| / \\mathrm{\mu m}^{-1}$',
+               ylabel='$P_k(|\\vec{k}_{\\parallel}|) /$ AU', xlim=(9, 13))
         ax.axvline(x=k_spp_r, linestyle='-.', color='b', linewidth='0.7', label='$k_{\\mathrm{spp}}$')
         ax.axvline(x=self.__k_0_NA, linestyle='-.', color='r', linewidth='0.7', label='$k_0\\mathrm{NA}$')
         ax.legend()
 
 
-    def plot_angular_profile(self, lambda_4_angle, fig, ax):
+    def plot_angular_profile(self, lambda_4_angle, min_rad, max_rad, fig, ax):
         angle, idx = self.__get_lambda_4_index(lambda_4_angle)
-        angular_profile = np.average(self.polar_data[idx], axis=1)
-        ax.plot(np.rad2deg(self.angular_values), angular_profile)
-        ax.set_title('AngularProfile, Lambda/4 angel{0}'.format(angle))
+        radial_mask = self.__get_radial_mask(min_rad, max_rad)
+        angular_profile = np.average(self.polar_data[idx][:, radial_mask], axis=1)
+        #kernel_size = 60
+        #kernel = np.ones(kernel_size) / kernel_size
+        #data_convolved = np.convolve(angular_profile, kernel, mode='same')
+        data_smothed = savgol_filter(angular_profile, 201, 5, mode='wrap')
+        ax.plot(self.angular_values, data_smothed, label='$P_k(\\phi, \\alpha_{\lambda/4}='+f'{lambda_4_angle}'+'^\\circ)$')
+        ax.set_yticklabels([])
+
+    def plot_angular_profile_diff(self, lambda_4_angle_1, lambda_4_angle_2, min_rad, max_rad, fig, ax):
+        angle1, idx1 = self.__get_lambda_4_index(lambda_4_angle_1)
+        angle2, idx2 = self.__get_lambda_4_index(lambda_4_angle_2)
+        radial_mask = self.__get_radial_mask(min_rad, max_rad)
+        angular_profile1 = np.average(self.polar_data[idx1][:, radial_mask], axis=1)
+        angular_profile2 = np.average(self.polar_data[idx2][:, radial_mask], axis=1)
+        diff = (angular_profile1 - angular_profile2) / (angular_profile1 + angular_profile2)
+        kernel_size = 40
+        kernel = np.ones(kernel_size) / kernel_size
+        data_convolved = np.convolve(diff, kernel, mode='same')
+        ax.plot(self.angular_values, data_convolved)
+        ax.plot(self.angular_values, np.zeros(self.angular_values.shape), '-k')
+        def add_scale(x):
+            rect = x.get_position()
+            rect = (rect.xmin - 0, rect.ymin + rect.height / 2,  # x, y
+                    rect.width, rect.height / 2)
+            scale_ax = x.figure.add_axes(rect)
+            for loc in ['right', 'top', 'bottom']:
+                scale_ax.spines[loc].set_visible(False)
+            scale_ax.tick_params(bottom=False, labelbottom=False)
+            scale_ax.patch.set_visible(False)
+            scale_ax.spines['left'].set_bounds(*x.get_ylim())
+            scale_ax.set_yticks(x.get_yticks())
+            scale_ax.set_ylim(x.get_rorigin(), x.get_rmax())
+            scale_ax.set_ylabel('$D_k\\left(\\phi\\right)$')
+        ax.set_ylim(-0.3, 0.3)
+        ax.set_rorigin(-1)
+        add_scale(ax)
+        ax.set_yticklabels([])
+        #ax.set_yticklabels([])
 
     def plot_masks(self, mid_angle, angle_width, angle_gap, min_rad, max_rad, fig, ax):
         left_mask, right_mask = self.__get_angle_masks(mid_angle, angle_width, angle_gap)
@@ -243,12 +271,20 @@ class SpinHallDataSet:
         right_angles = sorted(self.angular_values[right_mask])
 
         ax.plot(right_angles, np.full(len(right_angles), min_rad * self.__k_factor), '-.k', linewidth=1,
-                label='right SPP')
+                label='oberes SPP')
         ax.plot(right_angles, np.full(len(right_angles), max_rad * self.__k_factor), '-.k', linewidth=1)
 
         ax.plot(left_angles, np.full(len(left_angles), min_rad * self.__k_factor), '-.k', linewidth=1,
-                label='left SPP')
+                label='unteres SPP')
         ax.plot(left_angles, np.full(len(left_angles), max_rad * self.__k_factor), '-.k', linewidth=1)
+
+        ax.plot(np.full(2, np.min(left_angles)), [min_rad * self.__k_factor, max_rad * self.__k_factor], '-.k', linewidth=1)
+        ax.plot(np.full(2, np.max(left_angles)), [min_rad * self.__k_factor, max_rad* self.__k_factor], '-.k', linewidth=1)
+
+        ax.plot(np.full(2, np.min(right_angles)), [min_rad * self.__k_factor, max_rad * self.__k_factor], '-.k',
+                linewidth=1)
+        ax.plot(np.full(2, np.max(right_angles)), [min_rad * self.__k_factor, max_rad * self.__k_factor], '-.k',
+                linewidth=1)
 
         # ax.plot(np.full(len(self.radial_values_k), mid_angle), self.radial_values_k, linewidth=1)
 
@@ -261,12 +297,12 @@ class SpinHallDataSet:
         # ax.set_xlabel('$\\alpha_{\\lambda/4} / \\mathrm{deg}$')
         # ax.set_ylabel('normed integrated intensity')
         ax.set(xlabel='$\\alpha_{\\lambda/4} / \\mathrm{deg}$',
-               ylabel='normed integrated intensity',
+               ylabel='$P_{k, \\mathrm{relativ}}$',
                xticks=[0, 45, 90, 135, 180, 135, 180, 225, 270, 315, 360])
 
         sort_index = np.argsort(self.lambda_4_angles)
-        ax.plot(self.lambda_4_angles[sort_index], intensities[sort_index, 0], 'g+:', label="upper spp")
-        ax.plot(self.lambda_4_angles[sort_index], intensities[sort_index, 1], 'r+:', label="lower spp")
+        ax.plot(self.lambda_4_angles[sort_index], intensities[sort_index, 0], 'g+:', label="$P_{k, \\mathrm{relativ}, \\mathrm{Oben}}(\\alpha_{\\lambda/4})$")
+        ax.plot(self.lambda_4_angles[sort_index], intensities[sort_index, 1], 'r+:', label="$P_{k, \\mathrm{relativ}, \\mathrm{Unten}}(\\alpha_{\\lambda/4})$")
         # ax.tick_params(axis='y')
 
     def plot_polarisation_marks(self, fig, ax):
@@ -274,29 +310,6 @@ class SpinHallDataSet:
         # lin = np.array([0, 90, 180, 270])
         for c in circ:
             ax.axvline(x=c, linestyle='--', color='k', linewidth='0.5')
-
-
-    def plot_fp_diff(self, lambda_4_angle_1, lambda_4_angle_2, fig, ax):
-        angle1, idx1 = self.__get_fp_lambda_4_index(lambda_4_angle_1)
-        angle2, idx2 = self.__get_fp_lambda_4_index(lambda_4_angle_2)
-        diff = (self.fp_data[idx1] - self.fp_data[idx2]) / (self.fp_data[idx1] + self.fp_data[idx2])
-        range_diff = np.max([np.abs(np.min(diff)), np.abs(np.max(diff))])
-        clev = np.arange(-1, 1, 0.01)
-        cs = ax.contourf(self.x_values, self.y_values, diff, clev, cmap='bwr')
-        ax.set(xlabel='$x / \\mathrm{\\mu m}$', ylabel='$y / \\mathrm{\\mu m}$', aspect='equal')
-        cbar = fig.colorbar(cs)
-        cbar.set_label('relative intensity difference', rotation=90)
-        fig.tight_layout()
-    def plot_fp(self, lambda_4_angle, fig, ax):
-        angle, idx = self.__get_fp_lambda_4_index(lambda_4_angle)
-        clev = np.arange(0, 1, 0.01)
-        cs = ax.contourf(self.x_values, self.y_values, self.fp_data[idx] / np.max(self.fp_data[idx]), clev, cmap='plasma')
-        ax.set(xlabel='$x / \\mathrm{\\mu m}$', ylabel='$y / \\mathrm{\\mu m}$', aspect='equal')
-        cbar = fig.colorbar(cs)
-        cbar.set_label('intensity', rotation=90)
-        ax.axvline(x=0, linestyle='-', color='w')
-        ax.axhline(y=0, linestyle='-', color='w')
-        fig.tight_layout()
 
     def __get_fp_lambda_4_index(self, lambda_4_angle):
         idx = (np.abs(self.fp_lambda_4_angles - lambda_4_angle)).argmin()

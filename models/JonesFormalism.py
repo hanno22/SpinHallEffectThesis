@@ -1,5 +1,4 @@
 import cmath as cm
-
 import numpy as np
 
 
@@ -50,24 +49,18 @@ class JonesVector(np.ndarray):
         a = self.a
         b = self.b
         alpha = self.alpha
-        delta = self.delta
-        ellipticity = self.ellipticity
         x_alpha = a * np.array([np.cos(alpha + np.pi), np.cos(alpha)])
         y_alpha = a * np.array([np.sin(alpha + np.pi), np.sin(alpha)])
         x_alpha_pi_2 = b * np.array([np.cos(alpha + np.pi / 2 + np.pi), np.cos(alpha + np.pi / 2)])
         y_alpha_pi_2 = b * np.array([np.sin(alpha + np.pi / 2 + np.pi), np.sin(alpha + np.pi / 2)])
-        #ax.axis('square')
-        ax.plot(x_alpha, y_alpha, 'r--')
-        ax.plot(x_alpha_pi_2, y_alpha_pi_2, 'r--')
+
         ax.axis('equal')
-        ax.set_xlabel('$E_x$ / AU')
-        ax.set_ylabel('$E_y$ / AU')
+        ax.set(xlabel='$E_x$ / AU', ylabel='$E_y$ / AU')
         ax.grid()
-        #ax.text(0.5, 0.9,
-        #        '$\\delta$={:.1f}°, $\\alpha$={:.1f}°, ellipticity={:.1f}'.format(np.rad2deg(delta), np.rad2deg(alpha),
-        #                                                                          ellipticity),
-        #        ha='center', va='center', transform=ax.transAxes)
-        ax.plot(x, y)
+        ax.plot(x, y, label='$\\vec{E}(t) = \\operatorname{\\mathbb{R}e}\\left\\{\\vec{J}\\exp\\left(i \\omega t\\right)\\right\\}$')
+        ax.plot(x_alpha, y_alpha, 'r--', label='$a,b$')
+        ax.plot(x_alpha_pi_2, y_alpha_pi_2, 'r--')
+        ax.legend()
 
 
 class JonesMatrix(np.ndarray):
